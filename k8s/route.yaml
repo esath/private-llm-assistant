@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ollama-chat-frontend
+  labels:
+    app: ollama-chat-frontend
+spec:
+  to:
+    kind: Service
+    name: ollama-chat-frontend-svc
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None
+  # Optional TLS example:
+  # tls:
+  #   termination: edge
