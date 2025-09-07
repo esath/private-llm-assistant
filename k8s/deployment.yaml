@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-chat-backend
+  labels:
+    app: ollama-chat-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama-chat-backend
+  template:
+    metadata:
+      labels:
+        app: ollama-chat-backend
+    spec:
+      containers:
+      - name: backend
+        # IMPORTANT: Replace this with your container registry image path
+        image: docker.io/esath/ollama-rag-backend:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: OLLAMA_BASE_URL
+          # This should be the network address of your Ollama server,
+          # accessible from within the OKD cluster.
+          # Example: "http://192.168.1.50:11434"
+          value: "http://192.168.1.15:11434"
+        - name: OLLAMA_MODEL
+          value: "llama3:latest"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-chat-frontend
+  labels:
+    app: ollama-chat-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ollama-chat-frontend
+  template:
+    metadata:
+      labels:
+        app: ollama-chat-frontend
+    spec:
+      containers:
+      - name: frontend
+        # IMPORTANT: Replace this with your container registry image path
+        image: docker.io/esath/ollama-rag-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"

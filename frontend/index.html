@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chat with Ollama</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <header>
+            <h1>Ask a Question About Your Document</h1>
+            <p>This chat interface uses a local Ollama LLM and a RAG pipeline to answer questions based on a predefined FAQ document.</p>
+        </header>
+        
+        <main>
+            <div id="chat-window">
+                <div id="chat-messages">
+                    <!-- Chat messages will be dynamically inserted here -->
+                     <div class="message system">
+                        <p>Hello! How can I help you today?</p>
+                    </div>
+                </div>
+            </div>
+            <div id="loading-indicator" class="hidden">
+                <div class="spinner"></div>
+                <span>Thinking...</span>
+            </div>
+            <div id="chat-input-container">
+                <textarea id="chat-input" placeholder="Type your question here..." rows="1"></textarea>
+                <button id="send-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </main>
+        
+        <footer>
+            <p>Powered by Ollama, Flask, and OKD</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
