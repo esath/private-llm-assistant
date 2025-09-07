@@ -12,11 +12,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const resolveApiUrl = () => {
         if (window.API_URL && typeof window.API_URL === 'string') return window.API_URL;
         const host = window.location.hostname;
-        const isLocal = host === 'localhost' || host === '127.0.0.1';
-        return isLocal ? 'http://localhost:5000/api/chat' : '/api/chat';
+        const isLocalHost =
+            host === 'localhost' ||
+            host === '127.0.0.1' ||
+            host === '::1';
+        return isLocalHost ? 'http://localhost:5000/api/chat' : '/api/chat';
     };
     const API_URL = resolveApiUrl();
+    const HEALTH_URL = API_URL.replace(/\/chat$/, '/health');
     console.debug('[frontend] Using API_URL =', API_URL);
+
+    const showSystemMessage = (text) => {
+        const msg = document.createElement('div');
+        msg.classList.add('message', 'system');
+        const p = document.createElement('p');
+        p.textContent = text;
+        msg.appendChild(p);
+        chatMessages.appendChild(msg);
+    };
+
+    const fetchWithTimeout = (url, opts = {}, ms = 5000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), ms);
+        const merged = { ...opts, signal: controller.signal };
+        return fetch(url, merged).finally(() => clearTimeout(id));
+    };
+
+    // Probe backend on load and surface actionable hint if unreachable.
+    fetchWithTimeout(HEALTH_URL, { method: 'GET' }, 4000)
+        .then((r) => {
+            if (!r.ok) throw new Error(`Health check failed: ${r.status}`);
+        })
+        .catch(() => {
+            showSystemMessage(
+                `Backend not reachable at ${HEALTH_URL}. Ensure the backend runs on port 5000 (python app.py), or set window.API_URL in index.html to a reachable URL.`
+            );
+        });
 
     const sendMessage = async () => {
         const question = chatInput.value.trim();
@@ -77,7 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error fetching chat response:', error);
-            botParagraph.textContent = `Sorry, something went wrong. ${error.message || ''}`;
+            const networkHint = error.name === 'TypeError'
+                ? `Cannot reach ${API_URL}. Check backend is running and CORS/URL are correct.`
+                : '';
+            botParagraph.textContent = `Sorry, something went wrong. ${error.message || ''} ${networkHint}`;
         } finally {
             // Re-enable input and hide loading indicator
             chatInput.disabled = false;
