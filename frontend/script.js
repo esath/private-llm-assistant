@@ -5,21 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingIndicator = document.getElementById('loading-indicator');
 
     // --- CONFIGURATION ---
-    // In a real K8s deployment, this URL should point to the backend service.
-    // If you are running locally, it's 'http://localhost:5000/external/chat'.
-    // The '/external/chat' is a placeholder that will be proxied by Nginx in the Docker container.
-    // Allow overriding API URL (e.g., window.API_URL = 'http://localhost:5000/external/chat')
-    const resolveApiUrl = () => {
-        if (window.API_URL && typeof window.API_URL === 'string') return window.API_URL;
-        const host = window.location.hostname;
-        const isLocalHost =
-            host === 'localhost' ||
-            host === '127.0.0.1' ||
-            host === '::1';
-        return isLocalHost ? 'http://localhost:5000/external/chat' : '/external/chat';
-    };
-    const API_URL = resolveApiUrl();
-    const HEALTH_URL = API_URL.replace(/\/chat$/, '/health');
+    // Always use the in-cluster backend Service URL with correct API paths.
+    const BACKEND_BASE_URL = 'http://ollama-chat-backend-svc:5000';
+    const API_URL = `${BACKEND_BASE_URL}/api/chat`;
+    const HEALTH_URL = `${BACKEND_BASE_URL}/api/health`;
     console.debug('[frontend] Using API_URL =', API_URL);
 
     const showSystemMessage = (text) => {
@@ -45,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(() => {
             showSystemMessage(
-                `Backend not reachable at ${HEALTH_URL}. Ensure the backend runs on port 5000 (python app.py), or set window.API_URL in index.html to a reachable URL.`
+                `Backend not reachable at ${HEALTH_URL}. Ensure the backend Service is accessible from the client environment.`
             );
         });
 
