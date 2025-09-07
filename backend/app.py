@@ -14,8 +14,10 @@ from langchain_community.vectorstores import FAISS
 # If Ollama is running on a different host, set the OLLAMA_BASE_URL environment variable.
 # Example: export OLLAMA_BASE_URL=http://192.168.1.10:11434
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://192.168.1.15:11434")
-# The model you are using with Ollama (e.g., "llama3", "mistral")
+# The model for generation (e.g., "llama3")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
+# New: the model for embeddings (e.g., "nomic-embed-text")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 FAQ_DOCUMENT_PATH = "faq.md"
 
 # --- Initialization ---
@@ -45,10 +47,9 @@ def setup_rag_pipeline():
         docs = text_splitter.split_documents(documents)
 
         # 3. Create embeddings using an Ollama model
-        # Note: This uses the specified OLLAMA_MODEL for embeddings as well.
-        # You might consider using a dedicated embedding model for better performance.
+        # Note: This uses the specified OLLAMA_EMBED_MODEL for embeddings.
         print("Initializing embeddings model...")
-        embeddings = OllamaEmbeddings(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
+        embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
 
         # 4. Create a FAISS vector store from the document chunks
         # This is an in-memory vector store, perfect for this simple application.

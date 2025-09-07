@@ -8,7 +8,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // In a real K8s deployment, this URL should point to the backend service.
     // If you are running locally, it's 'http://localhost:5000/api/chat'.
     // The '/api/chat' is a placeholder that will be proxied by Nginx in the Docker container.
-    const API_URL = '/api/chat';
+    // Allow overriding API URL (e.g., window.API_URL = 'http://localhost:5000/api/chat')
+    const resolveApiUrl = () => {
+        if (window.API_URL && typeof window.API_URL === 'string') return window.API_URL;
+        const host = window.location.hostname;
+        const isLocal = host === 'localhost' || host === '127.0.0.1';
+        return isLocal ? 'http://localhost:5000/api/chat' : '/api/chat';
+    };
+    const API_URL = resolveApiUrl();
+    console.debug('[frontend] Using API_URL =', API_URL);
 
     const sendMessage = async () => {
         const question = chatInput.value.trim();
@@ -37,27 +45,39 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error(`API Error: ${response.statusText}`);
+                const details = await response.text().catch(() => '');
+                throw new Error(`API Error ${response.status}: ${details || response.statusText}`);
             }
             
             // Handle the streaming response
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let accumulatedResponse = '';
+            const renderMarkdown = (text) => {
+                if (window.marked && typeof window.marked.parse === 'function') {
+                    return window.marked.parse(text);
+                }
+                // Fallback: plain text if marked is unavailable
+                return null;
+            };
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
                 accumulatedResponse += decoder.decode(value, { stream: true });
-                // Use marked.js to render Markdown in real-time
-                botParagraph.innerHTML = marked.parse(accumulatedResponse);
+                const html = renderMarkdown(accumulatedResponse);
+                if (html !== null) {
+                    botParagraph.innerHTML = html;
+                } else {
+                    botParagraph.textContent = accumulatedResponse;
+                }
                 scrollToBottom();
             }
 
         } catch (error) {
             console.error('Error fetching chat response:', error);
-            botParagraph.innerHTML = 'Sorry, something went wrong. Please check the console for details.';
+            botParagraph.textContent = `Sorry, something went wrong. ${error.message || ''}`;
         } finally {
             // Re-enable input and hide loading indicator
             chatInput.disabled = false;

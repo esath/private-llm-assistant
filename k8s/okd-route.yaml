@@ -19,6 +19,6 @@ spec:
     name: ollama-chat-backend-svc
     weight: 0
   path: /api
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
+  #tls:
+  #  termination: edge
+  #  insecureEdgeTerminationPolicy: Redirect
