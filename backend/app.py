@@ -64,11 +64,13 @@ def setup_rag_pipeline():
 
 # --- Flask Routes ---
 @app.route('/api/health', methods=['GET'])
+@app.route('/external/health', methods=['GET'])
 def health_check():
     """Health check endpoint to verify the service is running."""
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/chat', methods=['POST'])
+@app.route('/external/chat', methods=['POST'])
 def chat_stream():
     """
     Handles chat requests, performs RAG, and streams the response.

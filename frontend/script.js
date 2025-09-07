@@ -6,9 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONFIGURATION ---
     // In a real K8s deployment, this URL should point to the backend service.
-    // If you are running locally, it's 'http://localhost:5000/api/chat'.
-    // The '/api/chat' is a placeholder that will be proxied by Nginx in the Docker container.
-    // Allow overriding API URL (e.g., window.API_URL = 'http://localhost:5000/api/chat')
+    // If you are running locally, it's 'http://localhost:5000/external/chat'.
+    // The '/external/chat' is a placeholder that will be proxied by Nginx in the Docker container.
+    // Allow overriding API URL (e.g., window.API_URL = 'http://localhost:5000/external/chat')
     const resolveApiUrl = () => {
         if (window.API_URL && typeof window.API_URL === 'string') return window.API_URL;
         const host = window.location.hostname;
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
             host === 'localhost' ||
             host === '127.0.0.1' ||
             host === '::1';
-        return isLocalHost ? 'http://localhost:5000/api/chat' : '/api/chat';
+        return isLocalHost ? 'http://localhost:5000/external/chat' : '/external/chat';
     };
     const API_URL = resolveApiUrl();
     const HEALTH_URL = API_URL.replace(/\/chat$/, '/health');
