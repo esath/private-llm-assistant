@@ -6,6 +6,8 @@ FROM nginx:1.25-alpine
 # Copy the static content (HTML, CSS, JS) into the Nginx server directory
 COPY . /usr/share/nginx/html
 
+RUN chown -R nginx:nginx /var/cache/nginx
+
 # Copy the Nginx configuration file
 # This is optional for this simple case, but good practice.
 # We will create a simple config to handle API proxying if needed.
