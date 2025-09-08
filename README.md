@@ -27,6 +27,7 @@ This guide provides a comprehensive walkthrough for building, containerizing, an
 ---
 
 ## Project Architecture
+![Architecture diagram](./architecture.png)
 
 Here’s a breakdown of how the components interact:
 
@@ -42,6 +43,7 @@ Here’s a breakdown of how the components interact:
 - **GitHub & GitHub Actions**: The source code is stored on GitHub. A GitHub Actions workflow automates the building and pushing of Docker images to a container registry (like Docker Hub or Quay.io).
 - **OKD Cluster**: Your Kubernetes platform where the application will be deployed.
 - **Argo CD**: Installed on your OKD cluster, it follows the GitOps pattern. It monitors your GitHub repository for changes to the Kubernetes manifests and automatically syncs the cluster state to match the desired state defined in Git.
+
 
 ---
 
