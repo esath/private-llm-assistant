@@ -1,13 +1,15 @@
 import os
 from flask import Flask, request, Response, stream_with_context, jsonify
 from flask_cors import CORS
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaEmbeddings  # updated import to avoid deprecation
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.vectorstores import FAISS
+import json
+import urllib.request
+import urllib.error
 
 # --- Configuration ---
 # Ensure your local Ollama server is running.
@@ -17,12 +19,39 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://192.168.1.15:11434")
 # The model for generation (e.g., "llama3")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
 # New: the model for embeddings (e.g., "nomic-embed-text")
-OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text:latest")  # include tag by default
 FAQ_DOCUMENT_PATH = "faq.md"
 
 # --- Initialization ---
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing
+
+# --- Helpers ---
+def _ollama_api(path: str) -> str:
+    base = OLLAMA_BASE_URL.rstrip("/")
+    return f"{base}{path}"
+
+def has_model(model_name: str) -> bool:
+    """
+    Checks if a model (with or without tag) is available on the Ollama server by calling /api/tags.
+    """
+    # Normalize acceptable names (with and without :latest)
+    candidates = {model_name}
+    if ":" not in model_name:
+        candidates.add(f"{model_name}:latest")
+
+    try:
+        req = urllib.request.Request(_ollama_api("/api/tags"), method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        models = payload.get("models", [])
+        installed = {m.get("name", "") for m in models}
+        # Also include model "model" field if present
+        installed |= {m.get("model", "") for m in models}
+        return any(any(inst.startswith(c) or inst == c for c in candidates) for inst in installed)
+    except Exception as e:
+        print(f"Warning: Could not verify Ollama models at {OLLAMA_BASE_URL} ({e}). Assuming missing.")
+        return False
 
 # --- LangChain RAG Setup ---
 vector_store = None
@@ -46,13 +75,24 @@ def setup_rag_pipeline():
         text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         docs = text_splitter.split_documents(documents)
 
+        # Validate models exist on the Ollama server before initializing
+        if not has_model(OLLAMA_EMBED_MODEL):
+            raise RuntimeError(
+                f"Embedding model '{OLLAMA_EMBED_MODEL}' not found on Ollama at {OLLAMA_BASE_URL}. "
+                f"Pull it on that server: `ollama pull {OLLAMA_EMBED_MODEL}`"
+            )
+        # Optional: also validate the generation model for earlier feedback
+        if not has_model(os.getenv("OLLAMA_MODEL", "llama3:latest")):
+            print(
+                f"Note: Generation model '{os.getenv('OLLAMA_MODEL', 'llama3:latest')}' not found on Ollama at {OLLAMA_BASE_URL}. "
+                f"Pull it if needed: `ollama pull {os.getenv('OLLAMA_MODEL', 'llama3:latest')}`"
+            )
+
         # 3. Create embeddings using an Ollama model
-        # Note: This uses the specified OLLAMA_EMBED_MODEL for embeddings.
         print("Initializing embeddings model...")
         embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
 
         # 4. Create a FAISS vector store from the document chunks
-        # This is an in-memory vector store, perfect for this simple application.
         print("Creating vector store...")
         vector_store = FAISS.from_documents(docs, embeddings)
         print("RAG pipeline setup complete.")

@@ -5,3 +5,5 @@ langchain-community
 faiss-cpu
 ollama
 langchain-text-splitters
+langchain-ollama
+requests
