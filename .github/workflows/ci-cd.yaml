@@ -3,7 +3,7 @@ name: Build and Push Docker Images
 on:
   push:
     branches:
-      - main
+      - '**'
 
 jobs:
   build-and-push:
@@ -21,13 +21,40 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Compute dynamic image tags
+        id: meta
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          BACKEND_REPO="${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-backend"
+          FRONTEND_REPO="${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-frontend"
+
+          BACKEND_TAGS="$BACKEND_REPO:${SAFE_BRANCH}\n$BACKEND_REPO:${SAFE_BRANCH}-${SHORT_SHA}"
+          FRONTEND_TAGS="$FRONTEND_REPO:${SAFE_BRANCH}\n$FRONTEND_REPO:${SAFE_BRANCH}-${SHORT_SHA}"
+
+          if [ "$SAFE_BRANCH" = "main" ]; then
+            BACKEND_TAGS="$BACKEND_TAGS\n$BACKEND_REPO:latest"
+            FRONTEND_TAGS="$FRONTEND_TAGS\n$FRONTEND_REPO:latest"
+          fi
+
+          echo "backend_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$BACKEND_TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "frontend_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$FRONTEND_TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Build and push backend image
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-backend:latest
+          tags: ${{ steps.meta.outputs.backend_tags }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v4
@@ -35,4 +62,4 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-frontend:latest
+          tags: ${{ steps.meta.outputs.frontend_tags }}

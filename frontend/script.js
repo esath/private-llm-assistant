@@ -5,10 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingIndicator = document.getElementById('loading-indicator');
 
     // --- CONFIGURATION ---
-    // Always use the in-cluster backend Service URL with correct API paths.
-    const BACKEND_BASE_URL = 'http://ollama-chat-backend-svc:5000';
-    const API_URL = `${BACKEND_BASE_URL}/api/chat`;
-    const HEALTH_URL = `${BACKEND_BASE_URL}/api/health`;
+    // Use same-origin and rely on Nginx reverse proxy for /api/*.
+    // const BACKEND_BASE_URL = 'http://ollama-chat-backend-svc:5000';
+    // const API_URL = `${BACKEND_BASE_URL}/api/chat`;
+    // const HEALTH_URL = `${BACKEND_BASE_URL}/api/health`;
+    const API_URL = '/api/chat';
+    const HEALTH_URL = '/api/health';
     console.debug('[frontend] Using API_URL =', API_URL);
 
     const showSystemMessage = (text) => {
