@@ -12,6 +12,7 @@ import json
 import urllib.request
 import urllib.error
 import re
+from threading import Lock
 
 # --- Configuration ---
 # Ensure your local Ollama server is running.
@@ -23,6 +24,14 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
 # New: the model for embeddings (e.g., "nomic-embed-text")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text:latest")  # include tag by default
 FAQ_DOCUMENT_PATH = "faq.md"
+
+AVAILABLE_FAQ_FILES = {
+    "finnish": "faq.md",
+    "english": "faq_en.md",
+}
+
+vector_store_cache = {}
+vector_store_lock = Lock()
 
 # --- Initialization ---
 app = Flask(__name__)
@@ -80,53 +89,35 @@ def localize_missing_context(is_finnish: bool) -> str:
 def localize_internal_error(is_finnish: bool) -> dict:
     return {"error": "Tapahtui sisäinen virhe."} if is_finnish else {"error": "An internal error occurred."}
 
-# --- LangChain RAG Setup ---
-vector_store = None
+def build_vector_store(faq_path: str):
+    if not os.path.exists(faq_path):
+        raise FileNotFoundError(f"FAQ file not found: {faq_path}")
+    loader = TextLoader(faq_path)
+    documents = loader.load()
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = text_splitter.split_documents(documents)
+    embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
+    return FAISS.from_documents(docs, embeddings)
 
+def get_vector_store(faq_path: str):
+    with vector_store_lock:
+        if faq_path not in vector_store_cache:
+            print(f"Building vector store for {faq_path}")
+            vector_store_cache[faq_path] = build_vector_store(faq_path)
+        return vector_store_cache[faq_path]
+
+# --- LangChain RAG Setup ---
 def setup_rag_pipeline():
     """
-    Initializes the RAG pipeline by loading the FAQ document,
-    creating embeddings, and setting up a vector store.
+    Initializes the RAG pipeline by preloading the default FAQ document.
     This function runs once at startup.
     """
-    global vector_store
+    default_path = AVAILABLE_FAQ_FILES["finnish"]
     try:
-        if not os.path.exists(FAQ_DOCUMENT_PATH):
-            raise FileNotFoundError(f"The FAQ document was not found at: {FAQ_DOCUMENT_PATH}")
-
-        # 1. Load the FAQ document
-        loader = TextLoader(FAQ_DOCUMENT_PATH)
-        documents = loader.load()
-
-        # 2. Split the document into chunks
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        docs = text_splitter.split_documents(documents)
-
-        # Validate models exist on the Ollama server before initializing
-        if not has_model(OLLAMA_EMBED_MODEL):
-            raise RuntimeError(
-                f"Embedding model '{OLLAMA_EMBED_MODEL}' not found on Ollama at {OLLAMA_BASE_URL}. "
-                f"Pull it on that server: `ollama pull {OLLAMA_EMBED_MODEL}`"
-            )
-        # Optional: also validate the generation model for earlier feedback
-        if not has_model(os.getenv("OLLAMA_MODEL", "llama3:latest")):
-            print(
-                f"Note: Generation model '{os.getenv('OLLAMA_MODEL', 'llama3:latest')}' not found on Ollama at {OLLAMA_BASE_URL}. "
-                f"Pull it if needed: `ollama pull {os.getenv('OLLAMA_MODEL', 'llama3:latest')}`"
-            )
-
-        # 3. Create embeddings using an Ollama model
-        print("Initializing embeddings model...")
-        embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
-
-        # 4. Create a FAISS vector store from the document chunks
-        print("Creating vector store...")
-        vector_store = FAISS.from_documents(docs, embeddings)
-        print("RAG pipeline setup complete.")
-
+        get_vector_store(default_path)
+        print("Preloaded Finnish FAQ vector store.")
     except Exception as e:
-        print(f"Error setting up RAG pipeline: {e}")
-        # Exit if the pipeline can't be set up, as the app is not useful without it.
+        print(f"Failed to preload default FAQ: {e}")
         exit(1)
 
 # --- Flask Routes ---
@@ -136,6 +127,11 @@ def health_check():
     """Health check endpoint to verify the service is running."""
     return jsonify({"status": "ok"}), 200
 
+@app.route('/api/faq-files', methods=['GET'])
+def list_faq_files():
+    """Endpoint to list available FAQ files."""
+    return jsonify({"files": list(AVAILABLE_FAQ_FILES.keys())})
+
 @app.route('/api/chat', methods=['POST'])
 @app.route('/external/chat', methods=['POST'])
 def chat_stream():
@@ -144,18 +140,20 @@ def chat_stream():
     """
     data = request.json
     question = data.get("question")
+    faq_key = data.get("faq", "finnish")
 
     if not question:
         return jsonify({"error": "Question is required"}), 400
-    if not vector_store:
-        return jsonify({"error": "Vector store not initialized"}), 500
+    if faq_key not in AVAILABLE_FAQ_FILES:
+        faq_key = "finnish"
+    faq_path = AVAILABLE_FAQ_FILES[faq_key]
 
     is_finnish = detect_finnish(question or "")
 
     try:
         # --- RAG Logic ---
         # 1. Find relevant documents from the vector store based on the user's question.
-        retriever = vector_store.as_retriever()
+        retriever = get_vector_store(faq_path).as_retriever()
         relevant_docs = retriever.invoke(question)
         
         # Combine the content of the relevant documents into a single context string.

@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-button');
     const chatMessages = document.getElementById('chat-messages');
     const loadingIndicator = document.getElementById('loading-indicator');
+    const faqSelect = document.getElementById('faq-select');
 
     // --- CONFIGURATION ---
     // Ensure only relative paths (served through Nginx reverse proxy).
@@ -64,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ question }),
+                body: JSON.stringify({ question, faq: faqSelect.value }),
             });
 
             if (!response.ok) {
