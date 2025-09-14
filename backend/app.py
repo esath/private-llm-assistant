@@ -11,6 +11,7 @@ from langchain_community.vectorstores import FAISS
 import json
 import urllib.request
 import urllib.error
+import re
 
 # --- Configuration ---
 # Ensure your local Ollama server is running.
@@ -53,6 +54,31 @@ def has_model(model_name: str) -> bool:
     except Exception as e:
         print(f"Warning: Could not verify Ollama models at {OLLAMA_BASE_URL} ({e}). Assuming missing.")
         return False
+
+def detect_finnish(text: str) -> bool:
+    """
+    Heuristic Finnish detector:
+    - Presence of Finnish specific characters (ä, ö)
+    - OR several common Finnish words.
+    """
+    if not text:
+        return False
+    t = text.lower()
+    if any(ch in t for ch in ("ä", "ö")):
+        return True
+    finn_words = ["mitä", "mikä", "olen", "sinä", "että", "tämä", "nämä", "kuinka", "miksi", "kuka", "missä", "koska", "olla", "ja", "vai"]
+    hits = sum(1 for w in finn_words if w in t)
+    return hits >= 2
+
+def localize_missing_context(is_finnish: bool) -> str:
+    return (
+        "Olen pahoillani, minulla ei ole tietoa siitä aiheesta annettuun dokumenttiin perustuen."
+        if is_finnish else
+        "I'm sorry, I don't have information on that topic based on the provided document."
+    )
+
+def localize_internal_error(is_finnish: bool) -> dict:
+    return {"error": "Tapahtui sisäinen virhe."} if is_finnish else {"error": "An internal error occurred."}
 
 # --- LangChain RAG Setup ---
 vector_store = None
@@ -124,6 +150,8 @@ def chat_stream():
     if not vector_store:
         return jsonify({"error": "Vector store not initialized"}), 500
 
+    is_finnish = detect_finnish(question or "")
+
     try:
         # --- RAG Logic ---
         # 1. Find relevant documents from the vector store based on the user's question.
@@ -133,22 +161,38 @@ def chat_stream():
         # Combine the content of the relevant documents into a single context string.
         context = "\n".join([doc.page_content for doc in relevant_docs])
 
+        missing_context_sentence = localize_missing_context(is_finnish)
+
         # --- LLM Interaction ---
         # 2. Define the prompt template
         # This template instructs the LLM on how to behave.
         template = """
-        You are a helpful Q&A assistant. Your task is to answer the user's question based ONLY on the following context.
-        If the answer is not found in the context, say "I'm sorry, I don't have information on that topic based on the provided document."
+You are a helpful Q&A assistant for a Retrieval-Augmented Generation system.
 
-        CONTEXT:
-        {context}
+{answer_language_guideline}
 
-        QUESTION:
-        {question}
+Answer ONLY from the provided context. If the answer is not in the context say EXACTLY:
+"{missing_context_sentence}"
 
-        ANSWER:
-        """
-        prompt = PromptTemplate(template=template, input_variables=["context", "question"])
+CONTEXT:
+{context}
+
+QUESTION:
+{question}
+
+ANSWER:
+"""
+        prompt = PromptTemplate(
+            template=template,
+            input_variables=["context", "question", "answer_language_guideline", "missing_context_sentence"]
+        )
+
+        if is_finnish:
+            guideline = ("Vastaa suomen kielellä. Jos kysymys on osittain englanniksi, "
+                         "käytä silti suomea. Älä keksi sisältöä kontekstin ulkopuolelta.")
+        else:
+            guideline = ("Respond in the same language as the question (keep English if English). "
+                         "Do NOT fabricate information outside the context.")
 
         # 3. Initialize the Ollama LLM
         llm = Ollama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
@@ -159,7 +203,12 @@ def chat_stream():
         # 5. Define the streaming generator
         def generate():
             # Use the `stream` method to get chunks of the response as they are generated.
-            stream = chain.stream({"context": context, "question": question})
+            stream = chain.stream({
+                "context": context,
+                "question": question,
+                "answer_language_guideline": guideline,
+                "missing_context_sentence": missing_context_sentence
+            })
             for chunk in stream:
                 # The structure of the chunk can vary, inspect it if needed.
                 # Here we assume the relevant text is in `chunk['text']`.
@@ -171,7 +220,7 @@ def chat_stream():
 
     except Exception as e:
         print(f"Error during chat processing: {e}")
-        return jsonify({"error": "An internal error occurred."}), 500
+        return jsonify(localize_internal_error(is_finnish)), 500
 
 if __name__ == '__main__':
     # Initialize the RAG pipeline when the application starts
