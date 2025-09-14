@@ -43,7 +43,7 @@
     <script>
         // API URL is fixed to http://ollama-chat-backend-svc:5000/api/* in script.js
         // Expose version (can be replaced at build time with sed or build arg)
-        window.__APP_VERSION__ = "{{VERSION}}"  // replace during CI if desired
+        window.__APP_VERSION__ = "{{VERSION}}" !== "{{" + "VERSION" + "}}" ? "{{VERSION}}" : "dev";  // fallback to "dev" if not replaced
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js?v={{VERSION}}"></script>
