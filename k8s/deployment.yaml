@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: docker.io/esath/ollama-rag-backend
+        image: docker.io/esath/ollama-rag-backend:testaus
         ports:
         - containerPort: 5000
         env:
@@ -50,7 +50,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: docker.io/esath/ollama-rag-frontend
+        image: docker.io/esath/ollama-rag-frontend:testaus
         ports:
         - containerPort: 8080
         resources:
