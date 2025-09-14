@@ -17,7 +17,7 @@ spec:
       containers:
       - name: backend
         # IMPORTANT: Replace this with your container registry image path
-        image: docker.io/esath/ollama-rag-backend:latest
+        image: docker.io/esath/ollama-rag-backend:testaus
         ports:
         - containerPort: 5000
         env:
@@ -55,7 +55,7 @@ spec:
       containers:
       - name: frontend
         # IMPORTANT: Replace this with your container registry image path
-        image: docker.io/esath/ollama-rag-frontend:latest
+        image: docker.io/esath/ollama-rag-frontend:testaus
         ports:
         - containerPort: 8080
         resources:
