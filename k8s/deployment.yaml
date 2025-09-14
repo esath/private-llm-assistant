@@ -16,15 +16,11 @@ spec:
     spec:
       containers:
       - name: backend
-        # IMPORTANT: Replace this with your container registry image path
-        image: docker.io/esath/ollama-rag-backend:testaus
+        image: docker.io/esath/ollama-rag-backend
         ports:
         - containerPort: 5000
         env:
         - name: OLLAMA_BASE_URL
-          # This should be the network address of your Ollama server,
-          # accessible from within the OKD cluster.
-          # Example: "http://192.168.1.50:11434"
           value: "http://192.168.1.15:11434"
         - name: OLLAMA_MODEL
           value: "llama3:latest"
@@ -54,8 +50,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        # IMPORTANT: Replace this with your container registry image path
-        image: docker.io/esath/ollama-rag-frontend:testaus
+        image: docker.io/esath/ollama-rag-frontend
         ports:
         - containerPort: 8080
         resources:
