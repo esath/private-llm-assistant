@@ -4,6 +4,7 @@ from flask_cors import CORS
 from langchain_ollama import OllamaEmbeddings  # updated import to avoid deprecation
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain_community.llms import Ollama  # restore LLM import
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS

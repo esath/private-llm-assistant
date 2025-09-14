@@ -11,6 +11,7 @@
         <header>
             <h1>Ask a Question About Your Document</h1>
             <p>This chat interface uses a local Ollama LLM and a RAG pipeline to answer questions based on a predefined FAQ document.</p>
+            <p>Version 2.0</p>
         </header>
         
         <main>
@@ -41,8 +42,10 @@
 
     <script>
         // API URL is fixed to http://ollama-chat-backend-svc:5000/api/* in script.js
+        // Expose version (can be replaced at build time with sed or build arg)
+        window.__APP_VERSION__ = "{{VERSION}}" !== "{{" + "VERSION" + "}}" ? "{{VERSION}}" : "dev";  // fallback to "dev" if not replaced
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v={{VERSION}}"></script>
 </body>
 </html>

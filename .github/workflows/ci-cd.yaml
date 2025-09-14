@@ -3,7 +3,10 @@ name: Build and Push Docker Images
 on:
   push:
     branches:
-      - main
+      - '**'
+
+permissions:
+  contents: write
 
 jobs:
   build-and-push:
@@ -21,13 +24,40 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Compute dynamic image tags
+        id: meta
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          BACKEND_REPO="${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-backend"
+          FRONTEND_REPO="${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-frontend"
+
+          BACKEND_TAGS="$BACKEND_REPO:${SAFE_BRANCH}\n$BACKEND_REPO:${SAFE_BRANCH}-${SHORT_SHA}"
+          FRONTEND_TAGS="$FRONTEND_REPO:${SAFE_BRANCH}\n$FRONTEND_REPO:${SAFE_BRANCH}-${SHORT_SHA}"
+
+          if [ "$SAFE_BRANCH" = "main" ]; then
+            BACKEND_TAGS="$BACKEND_TAGS\n$BACKEND_REPO:latest"
+            FRONTEND_TAGS="$FRONTEND_TAGS\n$FRONTEND_REPO:latest"
+          fi
+
+          echo "backend_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$BACKEND_TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "frontend_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$FRONTEND_TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Build and push backend image
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-backend:latest
+          tags: ${{ steps.meta.outputs.backend_tags }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v4
@@ -35,4 +65,37 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ollama-rag-frontend:latest
+          tags: ${{ steps.meta.outputs.frontend_tags }}
+
+      - name: Patch deployment image tags to branch
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+
+          FILE="k8s/deployment.yaml"
+          cp "$FILE" "${FILE}.bak"
+
+          sed -i "s#\(docker.io/esath/ollama-rag-backend\)\(:[A-Za-z0-9._-]\+\)\?#\1:${SAFE_BRANCH}#g" "$FILE"
+          sed -i "s#\(docker.io/esath/ollama-rag-frontend\)\(:[A-Za-z0-9._-]\+\)\?#\1:${SAFE_BRANCH}#g" "$FILE"
+
+          if diff -q "${FILE}.bak" "$FILE" >/dev/null; then
+            echo "No image tag changes needed."
+            exit 0
+          fi
+
+          echo "Updated deployment.yaml to tag ${SAFE_BRANCH}:"
+          grep 'docker.io/esath/ollama-rag-' "$FILE"
+
+      - name: Commit and push image tag update
+        shell: bash
+        run: |
+          if git diff --quiet k8s/deployment.yaml; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/deployment.yaml
+          git commit -m "chore: image tag update (${GITHUB_REF_NAME})"
+          git push
