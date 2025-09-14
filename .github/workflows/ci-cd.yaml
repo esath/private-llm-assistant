@@ -15,12 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Skip if chore image tag commit
-        if: startsWith(github.event.head_commit.message, 'chore: image tag update')
-        run: |
-          echo "Skipping build for automated tag commit."
-          exit 0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
