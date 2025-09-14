@@ -1,14 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Version (injected via build arg or left default); helps confirm correct asset is loaded.
+    const VERSION = window.__APP_VERSION__ || 'dev';
+    console.debug('[frontend] Version =', VERSION);
+
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
     const chatMessages = document.getElementById('chat-messages');
     const loadingIndicator = document.getElementById('loading-indicator');
 
     // --- CONFIGURATION ---
-    // Use same-origin and rely on Nginx reverse proxy for /api/*.
-    // const BACKEND_BASE_URL = 'http://ollama-chat-backend-svc:5000';
-    // const API_URL = `${BACKEND_BASE_URL}/api/chat`;
-    // const HEALTH_URL = `${BACKEND_BASE_URL}/api/health`;
+    // Ensure only relative paths (served through Nginx reverse proxy).
     const API_URL = '/api/chat';
     const HEALTH_URL = '/api/health';
     console.debug('[frontend] Using API_URL =', API_URL);
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(() => {
             showSystemMessage(
-                `Backend not reachable at ${HEALTH_URL}. Ensure the backend Service is accessible from the client environment.`
+                `Backend not reachable via relative path ${HEALTH_URL}. If you still see a full Service DNS name, your browser has cached an old script.js. Hard reload (Ctrl+Shift+R) or clear cache.`
             );
         });
 
