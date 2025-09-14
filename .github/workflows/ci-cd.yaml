@@ -10,11 +10,16 @@ permissions:
 
 jobs:
   build-and-push:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore: image tag update') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Skip if chore image tag commit
+        if: ${{ startsWith(github.event.head_commit.message, 'chore: image tag update') }}
+        run: |
+          echo "Skipping build for automated tag commit."
+          exit 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -77,7 +82,6 @@ jobs:
           FILE="k8s/deployment.yaml"
           cp "$FILE" "${FILE}.bak"
 
-          # Replace (with or without an existing tag)
           sed -i "s#\(docker.io/esath/ollama-rag-backend\)\(:[A-Za-z0-9._-]\+\)\?#\1:${SAFE_BRANCH}#g" "$FILE"
           sed -i "s#\(docker.io/esath/ollama-rag-frontend\)\(:[A-Za-z0-9._-]\+\)\?#\1:${SAFE_BRANCH}#g" "$FILE"
 
@@ -90,7 +94,6 @@ jobs:
           grep 'docker.io/esath/ollama-rag-' "$FILE"
 
       - name: Commit and push image tag update
-        if: success()
         shell: bash
         run: |
           if git diff --quiet k8s/deployment.yaml; then
